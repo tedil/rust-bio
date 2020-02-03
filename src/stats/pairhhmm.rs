@@ -603,7 +603,7 @@ mod tests {
     }
 
     impl EmissionParameters for TestEmissionParams {
-        fn prob_emit_x_and_y(&self, i: usize, j: usize) -> XYEmission {
+        fn prob_emit_x_and_y(&self, state: Base, i: usize, j: usize) -> XYEmission {
             if self.x[i] == self.y[j] {
                 XYEmission::Match(LogProb::from(Prob(1.0) - PROB_ILLUMINA_SUBST))
             } else {
@@ -611,11 +611,19 @@ mod tests {
             }
         }
 
-        fn prob_emit_x_and_gap(&self, _: usize) -> LogProb {
+        fn prob_emit_x_and_gap(&self, state: Base, _: usize) -> LogProb {
             prob_emit_x_or_y()
         }
 
-        fn prob_emit_gap_and_y(&self, _: usize) -> LogProb {
+        fn prob_emit_gap_and_y(&self, state: Base, _: usize) -> LogProb {
+            prob_emit_x_or_y()
+        }
+
+        fn prob_emit_x_and_hop(&self, state: Base, i: usize) -> LogProb {
+            prob_emit_x_or_y()
+        }
+
+        fn prob_emit_hop_and_y(&self, state: Base, j: usize) -> LogProb {
             prob_emit_x_or_y()
         }
 
@@ -625,6 +633,35 @@ mod tests {
 
         fn len_y(&self) -> usize {
             self.y.len()
+        }
+    }
+
+    struct HomopolymerParams;
+    impl HomopolymerParameters for HomopolymerParams {
+        fn prob_hop_x(&self, state: Base) -> LogProb {
+            match state {
+                Base::A => LogProb::from(Prob(0.11)),
+                Base::C => LogProb::from(Prob(0.07)),
+                Base::G => LogProb::from(Prob(0.08)),
+                Base::T => LogProb::from(Prob(0.12)),
+            }
+        }
+
+        fn prob_hop_y(&self, state: Base) -> LogProb {
+            match state {
+                Base::A => LogProb::from(Prob(0.12)),
+                Base::C => LogProb::from(Prob(0.13)),
+                Base::G => LogProb::from(Prob(0.11)),
+                Base::T => LogProb::from(Prob(0.11)),
+            }
+        }
+
+        fn prob_hop_x_extend(&self, state: Base) -> LogProb {
+            self.prob_hop_x(state)
+        }
+
+        fn prob_hop_y_extend(&self, state: Base) -> LogProb {
+            self.prob_hop_y(state)
         }
     }
 
@@ -695,9 +732,10 @@ mod tests {
 
         let emission_params = TestEmissionParams { x, y };
         let gap_params = TestGapParams;
+        let homopolymer_params = HomopolymerParams;
 
         let mut pair_hmm = PairHHMM::new();
-        let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
+        let p = pair_hmm.prob_related(&gap_params, &homopolymer_params, &emission_params, None);
 
         assert!(*p <= 0.0);
         assert_relative_eq!(*p, 0.0, epsilon = 0.1);
@@ -710,9 +748,10 @@ mod tests {
 
         let emission_params = TestEmissionParams { x, y };
         let gap_params = TestGapParams;
+        let homopolymer_params = HomopolymerParams;
 
         let mut pair_hmm = PairHHMM::new();
-        let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
+        let p = pair_hmm.prob_related(&gap_params, &homopolymer_params, &emission_params, None);
 
         assert!(*p <= 0.0);
         assert_relative_eq!(p.exp(), PROB_ILLUMINA_INS.powi(2), epsilon = 1e-11);
@@ -725,9 +764,10 @@ mod tests {
 
         let emission_params = TestEmissionParams { x, y };
         let gap_params = TestGapParams;
+        let homopolymer_params = HomopolymerParams;
 
         let mut pair_hmm = PairHHMM::new();
-        let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
+        let p = pair_hmm.prob_related(&gap_params, &homopolymer_params, &emission_params, None);
 
         assert!(*p <= 0.0);
         assert_relative_eq!(p.exp(), PROB_ILLUMINA_DEL.powi(2), epsilon = 1e-10);
@@ -740,9 +780,10 @@ mod tests {
 
         let emission_params = TestEmissionParams { x, y };
         let gap_params = TestGapParams;
+        let homopolymer_params = HomopolymerParams;
 
         let mut pair_hmm = PairHHMM::new();
-        let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
+        let p = pair_hmm.prob_related(&gap_params, &homopolymer_params, &emission_params, None);
 
         assert!(*p <= 0.0);
         assert_relative_eq!(
@@ -762,11 +803,13 @@ CTGTCTTTGATTCCTGCCTCATCCTATTATTTATCGCACCTACGTTCAATATTACAGGCGAACATACTTACTAAAGTGT"
 
         let emission_params = TestEmissionParams { x, y };
         let gap_params = SemiglobalGapParams;
+        let homopolymer_params = HomopolymerParams;
 
         let mut pair_hmm = PairHHMM::new();
-        let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
+        let p = pair_hmm.prob_related(&gap_params, &homopolymer_params, &emission_params, None);
 
-        let p_banded = pair_hmm.prob_related(&gap_params, &emission_params, Some(2));
+        let p_banded =
+            pair_hmm.prob_related(&gap_params, &homopolymer_params, &emission_params, Some(2));
 
         assert_relative_eq!(*p, *p_banded, epsilon = 1e-7);
     }
