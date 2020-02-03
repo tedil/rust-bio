@@ -286,15 +286,15 @@ impl PairHHMM {
         let mut prev = 0;
         let mut curr = 1;
         for b in 0..NUM_BASES {
-            self.fmm[prev][0][b] = LogProb::ln_one();
+            self.fmm[prev][b][0] = LogProb::ln_one();
         }
 
         // iterate over x
         for i in 0..emission_params.len_x() {
             // allow alignment to start from offset in x (if prob_start_gap_x is set accordingly)
             for b in 0..NUM_BASES {
-                self.fmm[prev][0][b] =
-                    self.fmm[prev][0][b].ln_add_exp(gap_params.prob_start_gap_x(i));
+                self.fmm[prev][b][0] =
+                    self.fmm[prev][b][0].ln_add_exp(gap_params.prob_start_gap_x(i));
             }
 
             if gap_params.free_start_gap_x() {
@@ -369,38 +369,38 @@ impl PairHHMM {
                             emission_params.prob_emit_x_and_y(base, i, j).prob()
                                 + LogProb::ln_sum_exp(&[
                                     // coming from one of the NUM_BASES match states
-                                    prob_no_gap + no_hop_probs[0] + fmm_prev[j_minus_one][0],
-                                    prob_no_gap + no_hop_probs[1] + fmm_prev[j_minus_one][1],
-                                    prob_no_gap + no_hop_probs[2] + fmm_prev[j_minus_one][2],
-                                    prob_no_gap + no_hop_probs[3] + fmm_prev[j_minus_one][3],
+                                    prob_no_gap + no_hop_probs[0] + fmm_prev[0][j_minus_one],
+                                    prob_no_gap + no_hop_probs[1] + fmm_prev[1][j_minus_one],
+                                    prob_no_gap + no_hop_probs[2] + fmm_prev[2][j_minus_one],
+                                    prob_no_gap + no_hop_probs[3] + fmm_prev[3][j_minus_one],
                                     // coming from one of the gap states
                                     prob_no_gap_x_extend + fgx_prev[j_minus_one],
                                     prob_no_gap_y_extend + fgy_prev[j_minus_one],
                                     // coming from one of the hop states
                                     prob_no_gap
                                         + no_hop_x_extend_probs[0]
-                                        + fhx_prev[j_minus_one][0],
+                                        + fhx_prev[0][j_minus_one],
                                     prob_no_gap
                                         + no_hop_x_extend_probs[1]
-                                        + fhx_prev[j_minus_one][1],
+                                        + fhx_prev[1][j_minus_one],
                                     prob_no_gap
                                         + no_hop_x_extend_probs[2]
-                                        + fhx_prev[j_minus_one][2],
+                                        + fhx_prev[2][j_minus_one],
                                     prob_no_gap
                                         + no_hop_x_extend_probs[3]
-                                        + fhx_prev[j_minus_one][3],
+                                        + fhx_prev[3][j_minus_one],
                                     prob_no_gap
                                         + no_hop_y_extend_probs[0]
-                                        + fhy_prev[j_minus_one][0],
+                                        + fhy_prev[0][j_minus_one],
                                     prob_no_gap
                                         + no_hop_y_extend_probs[1]
-                                        + fhy_prev[j_minus_one][1],
+                                        + fhy_prev[1][j_minus_one],
                                     prob_no_gap
                                         + no_hop_y_extend_probs[2]
-                                        + fhy_prev[j_minus_one][2],
+                                        + fhy_prev[2][j_minus_one],
                                     prob_no_gap
                                         + no_hop_y_extend_probs[3]
-                                        + fhy_prev[j_minus_one][3],
+                                        + fhy_prev[3][j_minus_one],
                                 ])
                         })
                         .collect();
@@ -410,20 +410,20 @@ impl PairHHMM {
                     let mut prob_gap_in_y = emit_x_and_gap_probs[0]
                         + LogProb::ln_sum_exp(&[
                             // open gap from one of the match states
-                            prob_open_gap_y + fmm_prev[j_][0],
-                            prob_open_gap_y + fmm_prev[j_][1],
-                            prob_open_gap_y + fmm_prev[j_][2],
-                            prob_open_gap_y + fmm_prev[j_][3],
+                            prob_open_gap_y + fmm_prev[0][j_],
+                            prob_open_gap_y + fmm_prev[1][j_],
+                            prob_open_gap_y + fmm_prev[2][j_],
+                            prob_open_gap_y + fmm_prev[3][j_],
                             // open gap from one of the hop x states
-                            prob_open_gap_y + fhx_prev[j_][0],
-                            prob_open_gap_y + fhx_prev[j_][1],
-                            prob_open_gap_y + fhx_prev[j_][2],
-                            prob_open_gap_y + fhx_prev[j_][3],
+                            prob_open_gap_y + fhx_prev[0][j_],
+                            prob_open_gap_y + fhx_prev[1][j_],
+                            prob_open_gap_y + fhx_prev[2][j_],
+                            prob_open_gap_y + fhx_prev[3][j_],
                             // open gap from one of the hop y states
-                            prob_open_gap_y + fhy_prev[j_][0],
-                            prob_open_gap_y + fhy_prev[j_][1],
-                            prob_open_gap_y + fhy_prev[j_][2],
-                            prob_open_gap_y + fhy_prev[j_][3],
+                            prob_open_gap_y + fhy_prev[0][j_],
+                            prob_open_gap_y + fhy_prev[1][j_],
+                            prob_open_gap_y + fhy_prev[2][j_],
+                            prob_open_gap_y + fhy_prev[3][j_],
                         ]);
                     if extend_gap_in_y {
                         prob_gap_in_y = prob_gap_in_y.ln_add_exp(
@@ -437,20 +437,20 @@ impl PairHHMM {
                     let mut prob_gap_in_x = emission_params.prob_emit_gap_and_y(Base::A, j)
                         + LogProb::ln_sum_exp(&[
                             // open gap from one of the match states
-                            prob_open_gap_x + fmm_curr[j_minus_one][0],
-                            prob_open_gap_x + fmm_curr[j_minus_one][1],
-                            prob_open_gap_x + fmm_curr[j_minus_one][2],
-                            prob_open_gap_x + fmm_curr[j_minus_one][3],
+                            prob_open_gap_x + fmm_curr[0][j_minus_one],
+                            prob_open_gap_x + fmm_curr[1][j_minus_one],
+                            prob_open_gap_x + fmm_curr[2][j_minus_one],
+                            prob_open_gap_x + fmm_curr[3][j_minus_one],
                             // open gap from one of the hop x states
-                            prob_open_gap_x + fhx_curr[j_minus_one][0],
-                            prob_open_gap_x + fhx_curr[j_minus_one][1],
-                            prob_open_gap_x + fhx_curr[j_minus_one][2],
-                            prob_open_gap_x + fhx_curr[j_minus_one][3],
+                            prob_open_gap_x + fhx_curr[0][j_minus_one],
+                            prob_open_gap_x + fhx_curr[1][j_minus_one],
+                            prob_open_gap_x + fhx_curr[2][j_minus_one],
+                            prob_open_gap_x + fhx_curr[3][j_minus_one],
                             // open gap from one of the hop y states
-                            prob_open_gap_x + fhy_curr[j_minus_one][0],
-                            prob_open_gap_x + fhy_curr[j_minus_one][1],
-                            prob_open_gap_x + fhy_curr[j_minus_one][2],
-                            prob_open_gap_x + fhy_curr[j_minus_one][3],
+                            prob_open_gap_x + fhy_curr[0][j_minus_one],
+                            prob_open_gap_x + fhy_curr[1][j_minus_one],
+                            prob_open_gap_x + fhy_curr[2][j_minus_one],
+                            prob_open_gap_x + fhy_curr[3][j_minus_one],
                         ]);
                     if extend_gap_in_x {
                         prob_gap_in_x = prob_gap_in_x.ln_add_exp(
@@ -467,9 +467,9 @@ impl PairHHMM {
                             emission_params.prob_emit_hop_and_y(base, j)
                                 +
                                 // start hop
-                                start_hop_y_probs[b] + fmm_prev[j_][b]
+                                start_hop_y_probs[b] + fmm_prev[b][j_]
                                 + if extend_hop_y_probs[b] != LogProb::zero() {
-                                extend_hop_y_probs[b] + fhx_prev[j_][b]
+                                extend_hop_y_probs[b] + fhx_prev[b][j_]
                             } else { LogProb::zero() }
                         })
                         .collect();
@@ -482,9 +482,9 @@ impl PairHHMM {
                             emission_params.prob_emit_x_and_hop(base, i)
                                 +
                                 // start hop
-                                start_hop_x_probs[b] + fmm_curr[j_minus_one][b]
+                                start_hop_x_probs[b] + fmm_curr[b][j_minus_one]
                                 + if extend_hop_x_probs[b] != LogProb::zero() {
-                                extend_hop_x_probs[b] + fhy_curr[j_minus_one][b]
+                                extend_hop_x_probs[b] + fhy_curr[b][j_minus_one]
                             } else { LogProb::zero() }
                         })
                         .collect();
@@ -525,9 +525,9 @@ impl PairHHMM {
 
                 for &base in &Base::values() {
                     let b = base as usize;
-                    self.fmm[curr][j_][b] = match_mismatch_probs[b];
-                    self.fhx[curr][j_][b] = hop_in_x_probs[b];
-                    self.fhy[curr][j_][b] = hop_in_y_probs[b];
+                    self.fmm[curr][b][j_] = match_mismatch_probs[b];
+                    self.fhx[curr][b][j_] = hop_in_x_probs[b];
+                    self.fhy[curr][b][j_] = hop_in_y_probs[b];
                 }
                 self.fgx[curr][j_] = gap_in_y_prob;
                 self.fgy[curr][j_] = gap_in_x_prob;
@@ -552,13 +552,10 @@ impl PairHHMM {
             // next column
             mem::swap(&mut curr, &mut prev);
             // reset next column to zeros
-            for v in &mut self.fmm[curr] {
-                *v = vec![
-                    LogProb::ln_zero(),
-                    LogProb::ln_zero(),
-                    LogProb::ln_zero(),
-                    LogProb::ln_zero(),
-                ];
+            for &base in &Base::values() {
+                for v in &mut self.fmm[curr][base as usize] {
+                    *v = LogProb::ln_zero();
+                }
             }
         }
 
