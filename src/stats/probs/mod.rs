@@ -307,14 +307,14 @@ impl LogProb {
         D: FnMut(usize, T) -> LogProb,
         f64: From<T>,
     {
-        let probs = linspace(a, b, n)
+        let mut probs = linspace(a, b, n)
             .enumerate()
             .dropping(1)
             .dropping_back(1)
             .map(|(i, v)| LogProb(*density(i, v) + 2.0f64.ln()))
-            .chain(once(density(0, a)))
-            .chain(once(density(n, b)))
             .collect_vec();
+        probs.push(density(0, a));
+        probs.push(density(n, b));
         let width = f64::from(b - a);
 
         LogProb(*Self::ln_sum_exp(&probs) + width.ln() - (2.0 * (n - 1) as f64).ln())
