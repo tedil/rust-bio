@@ -232,14 +232,15 @@ impl PairHHMM {
             self.min_edit_dist[k].clear();
             self.prob_cols.clear();
 
-            self.fgx[k].resize(emission_params.len_y() + 1, LogProb::ln_zero());
-            self.fgy[k].resize(emission_params.len_y() + 1, LogProb::ln_zero());
+            let l = emission_params.len_y() + 1;
+            self.fgx[k].resize(l, LogProb::ln_zero());
+            self.fgy[k].resize(l, LogProb::ln_zero());
             for b in 0..NUM_BASES {
-                self.fhx[k][b].resize(emission_params.len_y() + 1, LogProb::ln_zero());
-                self.fhy[k][b].resize(emission_params.len_y() + 1, LogProb::ln_zero());
-                self.fmm[k][b].resize(emission_params.len_y() + 1, LogProb::ln_zero());
+                self.fhx[k][b].resize(l, LogProb::ln_zero());
+                self.fhy[k][b].resize(l, LogProb::ln_zero());
+                self.fmm[k][b].resize(l, LogProb::ln_zero());
             }
-            self.min_edit_dist[k].resize(emission_params.len_y() + 1, usize::MAX);
+            self.min_edit_dist[k].resize(l, usize::MAX);
 
             if gap_params.free_end_gap_x() {
                 let c = (emission_params.len_x() * 3).saturating_sub(self.prob_cols.capacity());
