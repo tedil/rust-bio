@@ -22,7 +22,6 @@ use ordered_float::NotNan;
 use crate::utils::FastExp;
 
 pub use self::errors::{Error, Result};
-use std::iter::once;
 
 /// A factor to convert log-probabilities to PHRED-scale (phred = p * `LOG_TO_PHRED_FACTOR`).
 const LOG_TO_PHRED_FACTOR: f64 = -4.342_944_819_032_517_5; // -10 * 1 / ln(10)
@@ -214,18 +213,19 @@ impl LogProb {
     }
 
     /// Numerically stable sum of probabilities in log-space.
+    // pub fn ln_sum_exp<I: Iterator<Item=LogProb>>(probs: I) -> LogProb {
     pub fn ln_sum_exp(probs: &[LogProb]) -> LogProb {
         if probs.is_empty() {
             Self::ln_zero()
         } else {
-            let mut pmax = probs[0];
-            let mut imax = 0;
-            for (i, &p) in probs.iter().enumerate().skip(1) {
-                if p > pmax {
-                    pmax = p;
-                    imax = i;
-                }
-            }
+            // if LogProb implemented Ord, this could be replaced by `max_by_key`
+            let (imax, pmax) = probs
+                .iter()
+                .enumerate()
+                .fold(
+                    (0, probs[0]),
+                    |(i0, p0), (i, &p)| if p > p0 { (i, p) } else { (i0, p0) },
+                );
             if pmax == Self::ln_zero() {
                 Self::ln_zero()
             } else if *pmax == f64::INFINITY {

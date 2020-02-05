@@ -7,6 +7,7 @@
 
 pub mod bayesian;
 pub mod combinatorics;
+pub mod error_profiles;
 pub mod hmm;
 pub mod pairhhmm;
 pub mod pairhmm;
