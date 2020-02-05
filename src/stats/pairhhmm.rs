@@ -13,6 +13,7 @@ use std::usize;
 
 use crate::stats::error_profiles::{
     Base, EmissionParameters, ErrorProfile, GapParameters, HomopolymerParameters,
+    StartEndGapParameters,
 };
 use crate::stats::LogProb;
 use itertools::Itertools;
@@ -24,32 +25,6 @@ where
     F: Fn(Base) -> LogProb,
 {
     Base::values().iter().map(|&base| f(base)).collect()
-}
-
-/// Trait for parametrization of `PairHMM` start and end gap behavior.
-/// This trait can be used to implement global and semiglobal alignments.
-///
-/// * global: methods return `false` and `LogProb::ln_zero()`.
-/// * semiglobal: methods return `true` and `LogProb::ln_one()`.
-pub trait StartEndGapParameters {
-    /// Probability to start at x[i]. This can be left unchanged if you use `free_start_gap_x` and
-    /// `free_end_gap_x`.
-    #[inline]
-    #[allow(unused_variables)]
-    fn prob_start_gap_x(&self, i: usize) -> LogProb {
-        if self.free_start_gap_x() {
-            LogProb::ln_one()
-        } else {
-            // For global alignment, this has to return 0.0.
-            LogProb::ln_zero()
-        }
-    }
-
-    /// Allow free start gap in x.
-    fn free_start_gap_x(&self) -> bool;
-
-    /// Allow free end gap in x.
-    fn free_end_gap_x(&self) -> bool;
 }
 
 /// A pair Hidden Markov Model for comparing sequences x and y as described by
@@ -488,31 +463,8 @@ mod tests {
     use crate::stats::error_profiles::illumina::{
         PROB_ILLUMINA_DEL, PROB_ILLUMINA_INS, PROB_ILLUMINA_SUBST,
     };
+    use crate::stats::error_profiles::Locality;
     use crate::stats::Prob;
-
-    pub struct GlobalStartEndGapParams;
-
-    impl StartEndGapParameters for GlobalStartEndGapParams {
-        fn free_start_gap_x(&self) -> bool {
-            false
-        }
-
-        fn free_end_gap_x(&self) -> bool {
-            false
-        }
-    }
-
-    pub struct SemiglobalStartEndGapParams;
-
-    impl StartEndGapParameters for SemiglobalStartEndGapParams {
-        fn free_start_gap_x(&self) -> bool {
-            true
-        }
-
-        fn free_end_gap_x(&self) -> bool {
-            true
-        }
-    }
 
     #[test]
     fn test_same() {
@@ -520,7 +472,7 @@ mod tests {
         let y = b"AGCTCGATCGATCGATC";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
-        let start_end_gap_params = GlobalStartEndGapParams;
+        let start_end_gap_params = Locality::Global;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
@@ -539,7 +491,7 @@ mod tests {
         let y = b"AGGCTCGATCGATCGATC";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
-        let start_end_gap_params = GlobalStartEndGapParams;
+        let start_end_gap_params = Locality::Global;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
@@ -555,7 +507,7 @@ mod tests {
         let y = b"AGCTCGATCTGATCGATCT";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
-        let start_end_gap_params = GlobalStartEndGapParams;
+        let start_end_gap_params = Locality::Global;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
@@ -574,7 +526,7 @@ mod tests {
         let y = b"AGCTCGATCGATCGATC";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
-        let start_end_gap_params = GlobalStartEndGapParams;
+        let start_end_gap_params = Locality::Global;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
@@ -593,7 +545,7 @@ mod tests {
         let y = b"TGCTCGATCGATCGATC";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
-        let start_end_gap_params = GlobalStartEndGapParams;
+        let start_end_gap_params = Locality::Global;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
@@ -615,7 +567,7 @@ CTGTCTTTGATTCCTGCCTCATCCTATTATTTATCGCACCTACGTTCAATATTACAGGCGAACATACTTACTAAAGTGT"
         let y = b"GGGTATGCACGCGATAGCATTGCGAGATGCTGGAGCTGGAGCACCCTATGTCGC";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
-        let start_end_gap_params = SemiglobalStartEndGapParams;
+        let start_end_gap_params = Locality::Semiglobal;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);

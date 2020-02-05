@@ -101,3 +101,49 @@ pub trait HomopolymerParameters {
     /// Probability to extend homopolymer extension in y.
     fn prob_hop_y_extend(&self, state: Base) -> LogProb;
 }
+
+/// Trait for parametrization of `PairHMM` start and end gap behavior.
+/// This trait can be used to implement global and semiglobal alignments.
+///
+/// * global: methods return `false` and `LogProb::ln_zero()`.
+/// * semiglobal: methods return `true` and `LogProb::ln_one()`.
+pub trait StartEndGapParameters {
+    /// Probability to start at x[i]. This can be left unchanged if you use `free_start_gap_x` and
+    /// `free_end_gap_x`.
+    #[inline]
+    #[allow(unused_variables)]
+    fn prob_start_gap_x(&self, i: usize) -> LogProb {
+        if self.free_start_gap_x() {
+            LogProb::ln_one()
+        } else {
+            // For global alignment, this has to return 0.0.
+            LogProb::ln_zero()
+        }
+    }
+
+    /// Allow free start gap in x.
+    fn free_start_gap_x(&self) -> bool;
+
+    /// Allow free end gap in x.
+    fn free_end_gap_x(&self) -> bool;
+}
+pub enum Locality {
+    Global,
+    Semiglobal,
+}
+
+impl StartEndGapParameters for Locality {
+    fn free_start_gap_x(&self) -> bool {
+        match self {
+            Locality::Global => false,
+            Locality::Semiglobal => true,
+        }
+    }
+
+    fn free_end_gap_x(&self) -> bool {
+        match self {
+            Locality::Global => false,
+            Locality::Semiglobal => true,
+        }
+    }
+}
