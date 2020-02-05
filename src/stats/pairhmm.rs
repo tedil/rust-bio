@@ -475,9 +475,12 @@ mod tests {
 
         let mut pair_hmm = PairHMM::new();
         let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
-
         assert!(*p <= 0.0);
-        assert_relative_eq!(*p, 0.0, epsilon = 0.1);
+        assert_relative_eq!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).0.powi(x.len() as i32),
+            epsilon = 0.001
+        );
     }
 
     #[test]
