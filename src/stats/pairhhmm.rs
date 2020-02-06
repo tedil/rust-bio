@@ -132,6 +132,32 @@ impl PairHHMM {
         let extend_gap_in_y = prob_extend_gap_y != LogProb::ln_zero();
         let extend_gap_in_x = prob_extend_gap_x != LogProb::ln_zero();
 
+        let no_gap_no_hop_probs = cache_probs(|base| {
+            homopolymer_params
+                .prob_hop_x(base)
+                .ln_add_exp(homopolymer_params.prob_hop_y(base))
+                .ln_add_exp(gap_params.prob_gap_x())
+                .ln_add_exp(gap_params.prob_gap_y())
+                .ln_one_minus_exp()
+        });
+
+        let no_gap_no_hop_x_extend_probs = cache_probs(|base| {
+            homopolymer_params
+                .prob_hop_x_extend(base)
+                .ln_add_exp(gap_params.prob_gap_x())
+                .ln_add_exp(gap_params.prob_gap_y())
+                .ln_one_minus_exp()
+        });
+
+
+        let no_gap_no_hop_y_extend_probs = cache_probs(|base| {
+            homopolymer_params
+                .prob_hop_y_extend(base)
+                .ln_add_exp(gap_params.prob_gap_x())
+                .ln_add_exp(gap_params.prob_gap_y())
+                .ln_one_minus_exp()
+        });
+
         let no_hop_probs = cache_probs(|base| {
             homopolymer_params
                 .prob_hop_x(base)
@@ -243,16 +269,13 @@ impl PairHHMM {
                                         .flat_map(|b| {
                                             vec![
                                                 // coming from one of the match states
-                                                prob_no_gap
-                                                    + no_hop_probs[b]
+                                                no_gap_no_hop_probs[b]
                                                     + fmm_prev[b][j_minus_one],
                                                 // coming from one of the hop x states
-                                                prob_no_gap
-                                                    + no_hop_x_extend_probs[b]
+                                                no_gap_no_hop_x_extend_probs[b]
                                                     + fhx_prev[b][j_minus_one],
                                                 // coming from one of the hop y states
-                                                prob_no_gap
-                                                    + no_hop_y_extend_probs[b]
+                                                no_gap_no_hop_y_extend_probs[b]
                                                     + fhy_prev[b][j_minus_one],
                                             ]
                                         })
