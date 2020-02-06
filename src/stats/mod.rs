@@ -9,8 +9,8 @@ pub mod bayesian;
 pub mod combinatorics;
 pub mod error_profiles;
 pub mod hmm;
-pub mod pairhhmm;
 pub mod pairhmm;
+pub mod phmm;
 pub mod probs;
 
 pub use crate::stats::probs::{LogProb, PHREDProb, Prob};
