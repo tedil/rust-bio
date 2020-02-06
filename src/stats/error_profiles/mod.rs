@@ -87,7 +87,7 @@ pub trait GapParameters {
     fn prob_gap_y_extend(&self) -> LogProb;
 }
 
-/// Trait for parametrization of `PairHMM` gap behavior.
+/// Trait for parametrization of `PairHMM` hop behavior.
 pub trait HomopolymerParameters {
     /// Probability to start a homopolymer run extension in x.
     fn prob_hop_x(&self, state: Base) -> LogProb;

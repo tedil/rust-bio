@@ -126,7 +126,6 @@ impl PairHHMM {
                 .ln_add_exp(gap_params.prob_gap_x())
                 .ln_add_exp(gap_params.prob_gap_y())
                 .ln_one_minus_exp()
-                - LogProb::from(Prob(4.0))
         });
 
         let no_gap_no_hop_x_extend_probs = cache_probs(|base| {
@@ -135,7 +134,6 @@ impl PairHHMM {
                 .ln_add_exp(gap_params.prob_gap_x())
                 .ln_add_exp(gap_params.prob_gap_y())
                 .ln_one_minus_exp()
-                - LogProb::from(Prob(2.0))
         });
 
         let no_gap_no_hop_y_extend_probs = cache_probs(|base| {
@@ -144,7 +142,6 @@ impl PairHHMM {
                 .ln_add_exp(gap_params.prob_gap_x())
                 .ln_add_exp(gap_params.prob_gap_y())
                 .ln_one_minus_exp()
-                - LogProb::from(Prob(2.0))
         });
 
         let start_hop_x_probs = cache_probs(|base| homopolymer_params.prob_hop_x(base));
@@ -242,12 +239,15 @@ impl PairHHMM {
                                         .flat_map(|b| {
                                             vec![
                                                 // coming from any of the match states
-                                                no_gap_no_hop_probs[b] + fmm_prev[b][j_minus_one],
+                                                no_gap_no_hop_probs[b] - LogProb::from(Prob(4.0))
+                                                    + fmm_prev[b][j_minus_one],
                                                 // coming from one of the hop x states
                                                 no_gap_no_hop_x_extend_probs[b]
+                                                    - LogProb::from(Prob(3.0))
                                                     + fhx_prev[b][j_minus_one],
                                                 // coming from one of the hop y states
                                                 no_gap_no_hop_y_extend_probs[b]
+                                                    - LogProb::from(Prob(3.0))
                                                     + fhy_prev[b][j_minus_one],
                                             ]
                                         })
