@@ -232,23 +232,31 @@ impl PairHHMM {
                     // match or mismatch
                     let match_mismatch_probs: SmallVec<[LogProb; NUM_BASES]> = Base::values()
                         .iter()
-                        .map(|&base| {
-                            emission_params.prob_emit_x_and_y(base, i, j).prob()
+                        .map(|&b1| {
+                            emission_params.prob_emit_x_and_y(b1, i, j).prob()
                                 + LogProb::ln_sum_exp(
                                     &(0..NUM_BASES)
-                                        .flat_map(|b| {
+                                        .flat_map(|b2| {
                                             vec![
                                                 // coming from any of the match states
-                                                no_gap_no_hop_probs[b] - LogProb::from(Prob(4.0))
-                                                    + fmm_prev[b][j_minus_one],
-                                                // coming from one of the hop x states
-                                                no_gap_no_hop_x_extend_probs[b]
-                                                    - LogProb::from(Prob(3.0))
-                                                    + fhx_prev[b][j_minus_one],
-                                                // coming from one of the hop y states
-                                                no_gap_no_hop_y_extend_probs[b]
-                                                    - LogProb::from(Prob(3.0))
-                                                    + fhy_prev[b][j_minus_one],
+                                                no_gap_no_hop_probs[b2] - LogProb::from(Prob(4.0))
+                                                    + fmm_prev[b2][j_minus_one],
+                                                // coming from any of the hop x states (!= b1)
+                                                if b2 != b1 as usize {
+                                                    no_gap_no_hop_x_extend_probs[b2]
+                                                        - LogProb::from(Prob(3.0))
+                                                        + fhx_prev[b2][j_minus_one]
+                                                } else {
+                                                    LogProb::zero()
+                                                },
+                                                // coming from any of the hop y states (!= b1)
+                                                if b2 != b1 as usize {
+                                                    no_gap_no_hop_y_extend_probs[b2]
+                                                        - LogProb::from(Prob(3.0))
+                                                        + fhy_prev[b2][j_minus_one]
+                                                } else {
+                                                    LogProb::zero()
+                                                },
                                             ]
                                         })
                                         .chain(vec![
