@@ -15,7 +15,7 @@ use crate::stats::error_profiles::{
     Base, EmissionParameters, ErrorProfile, GapParameters, HomopolymerParameters,
     StartEndGapParameters,
 };
-use crate::stats::LogProb;
+use crate::stats::{LogProb, Prob};
 use itertools::Itertools;
 use num_traits::Zero;
 use smallvec::SmallVec;
@@ -126,6 +126,7 @@ impl PairHHMM {
                 .ln_add_exp(gap_params.prob_gap_x())
                 .ln_add_exp(gap_params.prob_gap_y())
                 .ln_one_minus_exp()
+                - LogProb::from(Prob(4.0))
         });
 
         let no_gap_no_hop_x_extend_probs = cache_probs(|base| {
@@ -134,6 +135,7 @@ impl PairHHMM {
                 .ln_add_exp(gap_params.prob_gap_x())
                 .ln_add_exp(gap_params.prob_gap_y())
                 .ln_one_minus_exp()
+                - LogProb::from(Prob(2.0))
         });
 
         let no_gap_no_hop_y_extend_probs = cache_probs(|base| {
@@ -142,6 +144,7 @@ impl PairHHMM {
                 .ln_add_exp(gap_params.prob_gap_x())
                 .ln_add_exp(gap_params.prob_gap_y())
                 .ln_one_minus_exp()
+                - LogProb::from(Prob(2.0))
         });
 
         let start_hop_x_probs = cache_probs(|base| homopolymer_params.prob_hop_x(base));
@@ -238,7 +241,7 @@ impl PairHHMM {
                                     &(0..NUM_BASES)
                                         .flat_map(|b| {
                                             vec![
-                                                // coming from one of the match states
+                                                // coming from any of the match states
                                                 no_gap_no_hop_probs[b] + fmm_prev[b][j_minus_one],
                                                 // coming from one of the hop x states
                                                 no_gap_no_hop_x_extend_probs[b]
@@ -260,18 +263,20 @@ impl PairHHMM {
 
                     // gap in y
                     let mut prob_gap_in_y = emit_x_and_gap_probs[0]
-                        + (0..NUM_BASES)
-                            .flat_map(|b| {
-                                vec![
-                                    // open gap from one of the match states
-                                    prob_open_gap_y + fmm_prev[b][j_],
-                                    // open gap from one of the hop x states
-                                    prob_open_gap_y + fhx_prev[b][j_],
-                                    // open gap from one of the hop y states
-                                    prob_open_gap_y + fhy_prev[b][j_],
-                                ]
-                            })
-                            .sum::<LogProb>();
+                        + LogProb::ln_sum_exp(
+                            &(0..NUM_BASES)
+                                .flat_map(|b| {
+                                    vec![
+                                        // open gap from one of the match states
+                                        prob_open_gap_y + fmm_prev[b][j_],
+                                        // open gap from one of the hop x states
+                                        prob_open_gap_y + fhx_prev[b][j_],
+                                        // open gap from one of the hop y states
+                                        prob_open_gap_y + fhy_prev[b][j_],
+                                    ]
+                                })
+                                .collect_vec(),
+                        );
                     if extend_gap_in_y {
                         prob_gap_in_y = prob_gap_in_y.ln_add_exp(
                             // extend gap
@@ -280,19 +285,21 @@ impl PairHHMM {
                     }
 
                     // gap in x
-                    let mut prob_gap_in_x = emission_params.prob_emit_gap_and_y(Base::A, j)
-                        + (0..NUM_BASES)
-                            .flat_map(|b| {
-                                vec![
-                                    // open gap from one of the match states
-                                    prob_open_gap_x + fmm_curr[b][j_minus_one],
-                                    // open gap from one of the hop x states
-                                    prob_open_gap_x + fhx_curr[b][j_minus_one],
-                                    // open gap from one of the hop y states
-                                    prob_open_gap_x + fhy_curr[b][j_minus_one],
-                                ]
-                            })
-                            .sum::<LogProb>();
+                    let mut prob_gap_in_x = emission_params.prob_emit_gap_and_y(Base::A, j) // any base will do
+                        + LogProb::ln_sum_exp(
+                            &(0..NUM_BASES)
+                                .flat_map(|b| {
+                                    vec![
+                                        // open gap from one of the match states
+                                        prob_open_gap_x + fmm_curr[b][j_minus_one],
+                                        // open gap from one of the hop x states
+                                        prob_open_gap_x + fhx_curr[b][j_minus_one],
+                                        // open gap from one of the hop y states
+                                        prob_open_gap_x + fhy_curr[b][j_minus_one],
+                                    ]
+                                })
+                                .collect_vec(),
+                        );
                     if extend_gap_in_x {
                         prob_gap_in_x = prob_gap_in_x.ln_add_exp(
                             // extend gap
@@ -308,7 +315,7 @@ impl PairHHMM {
                             emission_params.prob_emit_hop_and_y(base, j)
                                 + (start_hop_y_probs[b] + fmm_prev[b][j_]).ln_add_exp(
                                     if extend_hop_y_probs[b] != LogProb::zero() {
-                                        extend_hop_y_probs[b] + fhx_prev[b][j_]
+                                        extend_hop_y_probs[b] + fhy_prev[b][j_]
                                     } else {
                                         LogProb::zero()
                                     },
@@ -324,7 +331,7 @@ impl PairHHMM {
                             emission_params.prob_emit_x_and_hop(base, i)
                                 + (start_hop_x_probs[b] + fmm_curr[b][j_minus_one]).ln_add_exp(
                                     if extend_hop_x_probs[b] != LogProb::zero() {
-                                        extend_hop_x_probs[b] + fhy_curr[b][j_minus_one]
+                                        extend_hop_x_probs[b] + fhx_curr[b][j_minus_one]
                                     } else {
                                         LogProb::zero()
                                     },
@@ -478,6 +485,7 @@ mod tests {
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
 
+        dbg!(p.exp(), (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(17));
         assert!(*p <= 0.0);
         assert_relative_eq!(
             p.exp(),
@@ -488,8 +496,8 @@ mod tests {
 
     #[test]
     fn test_homopolymer() {
-        let x = b"AGCTCGATCGATCGATC";
-        let y = b"AGGCTCGATCGATCGATC";
+        let x = b"AGCCCT";
+        let y = b"AGCT";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
         let start_end_gap_params = Locality::Global;
@@ -498,8 +506,15 @@ mod tests {
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
 
         assert!(*p <= 0.0);
-        dbg!(p.exp(), (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(17) * 0.08);
-        assert_relative_eq!(p.exp(), 0.08, epsilon = 1e-11);
+        dbg!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(4) * 0.07 * 0.07
+        );
+        assert_relative_eq!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(4) * 0.07 * 0.07,
+            epsilon = 1e-11
+        );
     }
 
     #[test]
@@ -513,6 +528,10 @@ mod tests {
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
 
+        dbg!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(17) * PROB_ILLUMINA_INS.powi(2)
+        );
         assert!(*p <= 0.0);
         assert_relative_eq!(
             p.exp(),
@@ -532,6 +551,10 @@ mod tests {
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
 
+        dbg!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(17) * PROB_ILLUMINA_DEL.powi(2)
+        );
         assert!(*p <= 0.0);
         assert_relative_eq!(
             p.exp(),
@@ -551,6 +574,10 @@ mod tests {
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
 
+        dbg!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(15) * (PROB_ILLUMINA_SUBST / Prob(3.0)).powi(2)
+        );
         assert!(*p <= 0.0);
         assert_relative_eq!(
             p.exp(),
@@ -574,7 +601,7 @@ CTGTCTTTGATTCCTGCCTCATCCTATTATTTATCGCACCTACGTTCAATATTACAGGCGAACATACTTACTAAAGTGT"
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
 
         let p_banded = pair_hmm.prob_related(&error_profile, &start_end_gap_params, Some(2));
-
+        dbg!(p, p_banded);
         assert_relative_eq!(*p, *p_banded, epsilon = 1e-7);
     }
 }
