@@ -261,8 +261,10 @@ impl PairHHMM {
                                         })
                                         .chain(vec![
                                             // coming from one of the gap states
-                                            prob_no_gap_x_extend + fgx_prev[j_minus_one],
-                                            prob_no_gap_y_extend + fgy_prev[j_minus_one],
+                                            prob_no_gap_x_extend - LogProb::from(Prob(4.0))
+                                                + fgx_prev[j_minus_one],
+                                            prob_no_gap_y_extend - LogProb::from(Prob(4.0))
+                                                + fgy_prev[j_minus_one],
                                         ])
                                         .collect_vec(),
                                 )
