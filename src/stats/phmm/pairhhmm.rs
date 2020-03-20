@@ -19,6 +19,7 @@ use crate::stats::{LogProb, Prob};
 use itertools::Itertools;
 use num_traits::Zero;
 use smallvec::SmallVec;
+use num_traits::real::Real;
 
 fn cache_probs<F>(f: F) -> SmallVec<[LogProb; 4]>
 where
@@ -154,7 +155,7 @@ impl PairHHMM {
         for b in 0..NUM_BASES {
             self.fmm[prev][b][0] = LogProb::ln_one();
         }
-
+        println!("{}\t{}", -1, self.fmm[curr][0].iter().map(|p|Prob::from(*p).0).map(|v| format!("{:>.8}", v)).join("\t"));
         // iterate over x
         for i in 0..emission_params.len_x() {
             // allow alignment to start from offset in x (if prob_start_gap_x is set accordingly)
@@ -233,6 +234,7 @@ impl PairHHMM {
                     let match_mismatch_probs: SmallVec<[LogProb; NUM_BASES]> = Base::values()
                         .iter()
                         .map(|&b1| {
+                            let b1_ = b1 as usize;
                             emission_params.prob_emit_x_and_y(b1, i, j).prob()
                                 + LogProb::ln_sum_exp(
                                     &(0..NUM_BASES)
@@ -240,9 +242,9 @@ impl PairHHMM {
                                             vec![
                                                 // coming from any of the match states
                                                 no_gap_no_hop_probs[b2] - LogProb::from(Prob(4.0))
-                                                    + fmm_prev[b2][j_minus_one],
+                                                    + fmm_prev[b1_][j_minus_one],
                                                 // coming from any of the hop x states (!= b1)
-                                                if b2 != b1 as usize {
+                                                if b2 != b1_ {
                                                     no_gap_no_hop_x_extend_probs[b2]
                                                         - LogProb::from(Prob(3.0))
                                                         + fhx_prev[b2][j_minus_one]
@@ -250,7 +252,7 @@ impl PairHHMM {
                                                     LogProb::zero()
                                                 },
                                                 // coming from any of the hop y states (!= b1)
-                                                if b2 != b1 as usize {
+                                                if b2 != b1_ {
                                                     no_gap_no_hop_y_extend_probs[b2]
                                                         - LogProb::from(Prob(3.0))
                                                         + fhy_prev[b2][j_minus_one]
@@ -382,6 +384,15 @@ impl PairHHMM {
                         min_edit_dist,
                     )
                 };
+                let m = match_mismatch_probs.iter().cloned().collect_vec();
+                let hx = hop_in_x_probs.iter().cloned().collect_vec();
+                let hy = hop_in_y_probs.iter().cloned().collect_vec();
+                let match_prob = LogProb::ln_sum_exp(&m).exp();
+                let hx_prob = LogProb::ln_sum_exp(&hx).exp();
+                let hy_prob = LogProb::ln_sum_exp(&hy).exp();
+                let gx_prob = gap_in_x_prob.exp();
+                let gy_prob = gap_in_y_prob.exp();
+                // dbg!(((i, j), match_prob, hx_prob, hy_prob, gx_prob, gy_prob));
 
                 for &base in &Base::values() {
                     let b = base as usize;
@@ -412,7 +423,7 @@ impl PairHHMM {
                 // TODO check removing this (we don't want open gaps in x):
                 self.prob_cols.push(self.fgy[curr].last().unwrap().clone());
             }
-
+            println!("{}\t{}", i, self.fmm[curr][0].iter().map(|p| Prob::from(*p).0).map(|v| format!("{:>.8}", v)).join("\t"));
             // next column
             mem::swap(&mut curr, &mut prev);
             // reset next column to zeros
@@ -486,20 +497,40 @@ mod tests {
 
     #[test]
     fn test_same() {
-        let x = b"AGCTCGATCGATCGATC";
-        let y = b"AGCTCGATCGATCGATC";
+        let x = b"AAAA";
+        let y = b"AAAA";
 
         let error_profile = IlluminaR1ErrorProfile { x, y };
         let start_end_gap_params = Locality::Global;
 
         let mut pair_hmm = PairHHMM::new();
         let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
-
-        dbg!(p.exp(), (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(17));
+        let l = x.len() as i32;
+        dbg!(p.exp(), (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(l));
         assert!(*p <= 0.0);
         assert_relative_eq!(
             p.exp(),
-            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(17),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(l),
+            epsilon = 0.001
+        );
+    }
+
+    #[test]
+    fn test_substitution() {
+        let x = b"AAAA";
+        let y = b"AAAC";
+
+        let error_profile = IlluminaR1ErrorProfile { x, y };
+        let start_end_gap_params = Locality::Global;
+
+        let mut pair_hmm = PairHHMM::new();
+        let p = pair_hmm.prob_related(&error_profile, &start_end_gap_params, None);
+        let l = x.len() as i32;
+        dbg!(p.exp(), (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(l - 1) * PROB_ILLUMINA_SUBST.0);
+        assert!(*p <= 0.0);
+        assert_relative_eq!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(l - 1) * PROB_ILLUMINA_SUBST.0,
             epsilon = 0.001
         );
     }

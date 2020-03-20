@@ -52,7 +52,7 @@ impl EmissionParameters for IlluminaR1EmissionParams {
             }
         } else {
             if BASES[state as usize] == self.x[i] || BASES[state as usize] == self.y[j] {
-                XYEmission::Mismatch(LogProb::from(PROB_ILLUMINA_SUBST / Prob(3.0)))
+                XYEmission::Mismatch(LogProb::from(PROB_ILLUMINA_SUBST))
             } else {
                 XYEmission::Mismatch(LogProb::zero())
             }
@@ -96,6 +96,26 @@ pub struct IlluminaR1HomopolymerParams;
 
 impl HomopolymerParameters for IlluminaR1HomopolymerParams {
     fn prob_hop_x(&self, state: Base) -> LogProb {
+        // match state {
+        //     Base::A => LogProb::from(Prob(0.11)),
+        //     Base::C => LogProb::from(Prob(0.07)),
+        //     Base::G => LogProb::from(Prob(0.08)),
+        //     Base::T => LogProb::from(Prob(0.12)),
+        // }
+        LogProb::from(Prob(1e-5))
+    }
+
+    fn prob_hop_y(&self, state: Base) -> LogProb {
+        // match state {
+        //     Base::A => LogProb::from(Prob(0.12)),
+        //     Base::C => LogProb::from(Prob(0.13)),
+        //     Base::G => LogProb::from(Prob(0.11)),
+        //     Base::T => LogProb::from(Prob(0.11)),
+        // }
+        LogProb::from(Prob(1e-5))
+    }
+
+    fn prob_hop_x_extend(&self, state: Base) -> LogProb {
         match state {
             Base::A => LogProb::from(Prob(0.11)),
             Base::C => LogProb::from(Prob(0.07)),
@@ -104,21 +124,13 @@ impl HomopolymerParameters for IlluminaR1HomopolymerParams {
         }
     }
 
-    fn prob_hop_y(&self, state: Base) -> LogProb {
+    fn prob_hop_y_extend(&self, state: Base) -> LogProb {
         match state {
             Base::A => LogProb::from(Prob(0.12)),
             Base::C => LogProb::from(Prob(0.13)),
             Base::G => LogProb::from(Prob(0.11)),
             Base::T => LogProb::from(Prob(0.11)),
         }
-    }
-
-    fn prob_hop_x_extend(&self, state: Base) -> LogProb {
-        self.prob_hop_x(state)
-    }
-
-    fn prob_hop_y_extend(&self, state: Base) -> LogProb {
-        self.prob_hop_y(state)
     }
 }
 

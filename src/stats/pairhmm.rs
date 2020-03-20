@@ -11,7 +11,8 @@ use std::cmp;
 use std::mem;
 use std::usize;
 
-use crate::stats::LogProb;
+use crate::stats::{Prob, LogProb};
+use itertools::Itertools;
 
 /// Trait for parametrization of `PairHMM` gap behavior.
 pub trait GapParameters {
@@ -195,6 +196,7 @@ impl PairHMM {
         let mut curr = 1;
         self.fm[prev][0] = LogProb::ln_one();
 
+        println!("{}\t{}", -1, self.fm[curr].iter().map(|p| Prob::from(*p).0).map(|v| format!("{:>.8}", v)).join("\t"));
         // iterate over x
         for i in 0..emission_params.len_x() {
             // allow alignment to start from offset in x (if prob_start_gap_x is set accordingly)
@@ -330,6 +332,7 @@ impl PairHMM {
                 // TODO check removing this (we don't want open gaps in x):
                 self.prob_cols.push(self.fy[curr].last().unwrap().clone());
             }
+            println!("{}\t{}", i, self.fm[curr].iter().map(|p| Prob::from(*p).0).map(|v| format!("{:>.8}", v)).join("\t"));
 
             // next column
             mem::swap(&mut curr, &mut prev);
@@ -467,8 +470,8 @@ mod tests {
 
     #[test]
     fn test_same() {
-        let x = b"AGCTCGATCGATCGATC";
-        let y = b"AGCTCGATCGATCGATC";
+        let x = b"AAAA";
+        let y = b"AAAC";
 
         let emission_params = TestEmissionParams { x, y };
         let gap_params = TestGapParams;
@@ -476,9 +479,13 @@ mod tests {
         let mut pair_hmm = PairHMM::new();
         let p = pair_hmm.prob_related(&gap_params, &emission_params, None);
         assert!(*p <= 0.0);
+        dbg!(
+            p.exp(),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(x.len() as i32)
+        );
         assert_relative_eq!(
             p.exp(),
-            (Prob(1.0) - PROB_ILLUMINA_SUBST).0.powi(x.len() as i32),
+            (Prob(1.0) - PROB_ILLUMINA_SUBST).powi(x.len() as i32),
             epsilon = 0.001
         );
     }
