@@ -1,6 +1,8 @@
-use crate::utils::Interval;
+use std::cmp::min;
+
 use itertools::Itertools;
-use std::cmp::{min, Ordering};
+
+use crate::utils::Interval;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Entry<N: Ord + Clone + Copy, D> {
@@ -48,6 +50,23 @@ impl<N: Ord + Clone + Copy, D: Clone> IITree<N, D> {
     {
         let mut tree = Self::new();
         iter.for_each(|(interval, data)| tree.insert(interval, data));
+        tree.index();
+        tree
+    }
+
+    pub fn from_entries(entries: &[(Interval<N>, D)]) -> Self {
+        let mut tree = Self {
+            entries: entries
+                .iter()
+                .map(|(interval, data)| Entry {
+                    interval: interval.clone(),
+                    data: data.clone(),
+                    max: interval.end,
+                })
+                .collect_vec(),
+            max_level: 0,
+            indexed: false,
+        };
         tree.index();
         tree
     }
@@ -112,12 +131,18 @@ impl<N: Ord + Clone + Copy, D: Clone> IITree<N, D> {
     }
 
     pub fn overlap(&self, start: N, end: N) -> Vec<&Entry<N, D>> {
+        let mut buf = Vec::with_capacity(512);
+        self.overlap_into(start, end, &mut buf);
+        buf
+    }
+
+    pub fn overlap_into<'b, 'a: 'b>(&'a self, start: N, end: N, out: &mut Vec<&'b Entry<N, D>>) {
         if !self.indexed {
             panic!("This IITree has not been indexed yet. Call `index()` first.")
         }
         let n = self.entries.len() as usize;
         let a = &self.entries;
-        let mut result = Vec::new();
+        out.clear();
         let mut stack = [StackCell::empty(); 64];
         // push the root; this is a top down traversal
         stack[0].k = self.max_level;
@@ -125,8 +150,8 @@ impl<N: Ord + Clone + Copy, D: Clone> IITree<N, D> {
         stack[0].w = false;
         let mut t = 1;
         while t > 0 {
-            let StackCell {k, x, w} = stack[t - 1];
             t -= 1;
+            let StackCell { k, x, w } = stack[t];
             if k <= 3 {
                 // we are in a small subtree; traverse every node in this subtree
                 let i0 = x >> k << k;
@@ -137,7 +162,7 @@ impl<N: Ord + Clone + Copy, D: Clone> IITree<N, D> {
                     }
                     if start < a[i].interval.end {
                         // if overlap, append to out[]
-                        result.push(&self.entries[i]);
+                        out.push(&self.entries[i]);
                     }
                 }
             } else if w == false {
@@ -157,7 +182,7 @@ impl<N: Ord + Clone + Copy, D: Clone> IITree<N, D> {
             } else if x < n && a[x].interval.start < end {
                 // need to push the right child
                 if start < a[x].interval.end {
-                    result.push(&self.entries[x]);
+                    out.push(&self.entries[x]);
                 }
                 stack[t].k = k - 1;
                 stack[t].x = x + (1 << (k - 1));
@@ -165,7 +190,6 @@ impl<N: Ord + Clone + Copy, D: Clone> IITree<N, D> {
                 t += 1;
             }
         }
-        result
     }
 }
 
