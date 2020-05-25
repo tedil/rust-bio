@@ -25,6 +25,7 @@ use crate::stats::pairhmm::homopolypairhmm::State::*;
 use crate::stats::pairhmm::{GapParameters, StartEndGapParameters, XYEmission};
 use crate::stats::probs::LogProb;
 use crate::stats::Prob;
+use smallvec::SmallVec;
 
 /// The HomopolyPairHMM defined in this module has one Match state for each character from [A, C, G, T],
 /// for each of those Match states two corresponding Hop (homopolymer run) states
@@ -112,12 +113,6 @@ pub trait EmissionParameters {
     /// Emission probability for (-, y[j]).
     fn prob_emit_gap_and_y(&self, s: State, j: usize) -> LogProb;
 
-    /// Emission probability for (x[i], +).
-    fn prob_emit_x_and_hop(&self, s: State, i: usize) -> LogProb;
-
-    /// Emission probability for (+, y[j]).
-    fn prob_emit_hop_and_y(&self, s: State, j: usize) -> LogProb;
-
     fn len_x(&self) -> usize;
 
     fn len_y(&self) -> usize;
@@ -130,6 +125,8 @@ pub trait EmissionParameters {
 /// and transitions.
 #[derive(Debug, Clone)]
 pub struct HomopolyPairHMM {
+    start_hop_x: SmallVec<[LogProb; 4]>,
+    start_hop_y: SmallVec<[LogProb; 4]>,
     transition_probs: Vec<LogProb>,
 }
 
@@ -142,9 +139,11 @@ impl HomopolyPairHMM {
     pub fn new<G, H>(gap_params: &G, hop_params: &H) -> Self
     where
         G: GapParameters,
-        H: HopParameters,
+        H: HopParameters
     {
         Self {
+            start_hop_x: MATCH_STATES.iter().map(|&_m| hop_params.prob_hop_x()).collect(),
+            start_hop_y: MATCH_STATES.iter().map(|&_m| hop_params.prob_hop_y()).collect(),
             transition_probs: build_transition_table(gap_params, hop_params),
         }
     }
@@ -201,10 +200,6 @@ impl HomopolyPairHMM {
 
             // cache probs for x[i]
             let prob_emit_x_and_gap = emission_params.prob_emit_x_and_gap(GapY, i);
-            let mut probs_emit_x_and_hop: EnumMap<State, LogProb> = EnumMap::new();
-            HOP_Y_STATES
-                .iter()
-                .for_each(|&h| probs_emit_x_and_hop[h] = emission_params.prob_emit_x_and_hop(h, i));
 
             for j in 0..len_y {
                 let j_ = j + 1;
@@ -246,8 +241,7 @@ impl HomopolyPairHMM {
                     );
 
                 MATCH_HOP_Y.iter().for_each(|&(m, h)| {
-                    v[curr][h][j_] = probs_emit_x_and_hop[h]
-                        + ((transition_probs[m >> h] + v[prev][m][j_])
+                    v[curr][h][j_] = ((transition_probs[m >> h] + v[prev][m][j_])
                             .ln_add_exp(transition_probs[h >> h] + v[prev][h][j_]))
                 });
 
@@ -263,8 +257,7 @@ impl HomopolyPairHMM {
                     );
 
                 MATCH_HOP_X.iter().for_each(|&(m, h)| {
-                    v[curr][h][j_] = emission_params.prob_emit_hop_and_y(h, j)
-                        + ((transition_probs[m >> h] + v[curr][m][j_minus_one])
+                    v[curr][h][j_] = ((transition_probs[m >> h] + v[curr][m][j_minus_one])
                             .ln_add_exp(transition_probs[h >> h] + v[curr][h][j_minus_one]))
                 });
 
@@ -584,74 +577,6 @@ mod tests {
             PROB_SUBSTITUTION.ln_one_minus_exp()
         }
 
-        fn prob_emit_x_and_hop(&self, s: State, i: usize) -> LogProb {
-            match s {
-                State::HopAY => {
-                    if self.x[i] == b'A' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                State::HopCY => {
-                    if self.x[i] == b'C' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                State::HopGY => {
-                    if self.x[i] == b'G' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                State::HopTY => {
-                    if self.x[i] == b'T' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                _ => LogProb::zero(),
-            }
-        }
-
-        fn prob_emit_hop_and_y(&self, s: State, j: usize) -> LogProb {
-            match s {
-                State::HopAX => {
-                    if self.y[j] == b'A' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                State::HopCX => {
-                    if self.y[j] == b'C' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                State::HopGX => {
-                    if self.y[j] == b'G' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                State::HopTX => {
-                    if self.y[j] == b'T' {
-                        PROB_SUBSTITUTION.ln_one_minus_exp()
-                    } else {
-                        LogProb(*PROB_SUBSTITUTION - 3f64.ln())
-                    }
-                }
-                _ => LogProb::zero(),
-            }
-        }
-
         fn len_x(&self) -> usize {
             self.x.len()
         }
@@ -792,12 +717,9 @@ mod tests {
             *EMIT_MATCH // A A
                 + *T_MATCH_TO_MATCH
                 + *EMIT_MATCH // C C
-                + *T_MATCH_TO_HOP_X
-                + *EMIT_MATCH // C CC
-                + *T_HOP_X_TO_HOP_X
-                + *EMIT_MATCH // C CCC
-                + *T_HOP_X_TO_HOP_X
-                + *EMIT_MATCH // C CCCC
+                + *T_MATCH_TO_HOP_X // C CC
+                + *T_HOP_X_TO_HOP_X // C CCC
+                + *T_HOP_X_TO_HOP_X // C CCCC
                 + (1. - 0.1f64).ln()
                 + *EMIT_MATCH // G G
                 + *T_MATCH_TO_MATCH
@@ -819,12 +741,9 @@ mod tests {
             *EMIT_MATCH // A A
                 + *T_MATCH_TO_MATCH
                 + *EMIT_MATCH // C C
-                + *T_MATCH_TO_HOP_Y
-                + *EMIT_MATCH // CC C
-                + *T_HOP_Y_TO_HOP_Y
-                + *EMIT_MATCH // CCC C
-                + *T_HOP_Y_TO_HOP_Y
-                + *EMIT_MATCH // CCCC C
+                + *T_MATCH_TO_HOP_Y // CC C
+                + *T_HOP_Y_TO_HOP_Y // CCC C
+                + *T_HOP_Y_TO_HOP_Y // CCCC C
                 + (1. - 0.1f64).ln()
                 + *EMIT_MATCH // G G
                 + *T_MATCH_TO_MATCH

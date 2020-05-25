@@ -1,5 +1,4 @@
 use crate::stats::LogProb;
-pub use homopolypairhmm::EmissionParameters as ExtendedEmissionParameters;
 pub use homopolypairhmm::{HomopolyPairHMM, HopParameters};
 pub use pairhmm::{EmissionParameters, PairHMM};
 
