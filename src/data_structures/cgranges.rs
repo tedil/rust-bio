@@ -16,11 +16,20 @@
 //! tree.insert(12..34, 0);
 //! tree.insert(0..23, 1);
 //! tree.insert(34..56, 2);
+//! // since we did at least one manual insert, we have to index the tree
 //! tree.index();
 //! let i1 = tree.find(22..25)[0];
 //! assert_eq!(i1.interval().start(), 0);
 //! assert_eq!(i1.interval().end(), 23);
 //! assert_eq!(i1.data(), 1);
+//!
+//! let tree = IITree::from_iter(vec![(12..34, 0), (0..23, 1), (34..56, 2)]);
+//! // no call to `index` needed here, since that happens in `from_iter` already
+//! let i2 = tree.find(22..25)[1];
+//! assert_eq!(i1.interval().start(), 12);
+//! assert_eq!(i1.interval().end(), 34);
+//! assert_eq!(i1.data(), 0);
+//!
 //! ```
 //!
 
